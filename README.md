@@ -82,10 +82,15 @@ agente y el adaptador de proveedor de modelo, y `web/` es el front de chat.
 
 ## Link de prueba
 
-`<pendiente-de-despliegue>`
+**https://agente-oc-periferia.onrender.com**
 
-_(Se completa cuando el proyecto quede desplegado. Mientras tanto, se corre en
-local con los pasos de arriba.)_
+Sin clave de acceso, público. Verificado en vivo: procesa `sol-001` y crea la
+OC `4500000001` correctamente (ver `SOLUCION.md` para el detalle).
+
+La instancia corre en el free tier de Render, que **se apaga tras ~15 minutos
+sin tráfico**. Si el primer pedido después de un rato de inactividad tarda
+hasta un minuto en responder, es ese arranque en frío del plan gratuito, no
+un error de la app — los pedidos siguientes ya responden normal.
 
 ### Cómo desplegar en Render.com (free tier, sin tarjeta)
 
