@@ -97,10 +97,13 @@ type ResultadoCrear =
 async function crearOC(
   caso: string,
   payload: OrdenCompra,
-  validacion: Validacion,
+  // oc_crear ya no recibe `validacion`: la re-deriva ella misma desde `caso`
+  // (Tarea 2 de la auditoría). Se mantiene el parámetro acá solo porque el
+  // llamador ya la tiene disponible para las aserciones de la corrida.
+  _validacion: Validacion,
   confirmado: boolean
 ): Promise<ResultadoCrear> {
-  const crudo = parsear(await crear.execute({ caso, payload, validacion, confirmado }, ctx));
+  const crudo = parsear(await crear.execute({ caso, payload, confirmado }, ctx));
   if (!crudo.ok) return { ok: false, error: crudo.error };
   const data = CrearDataSchema.parse(crudo.data);
   return { ok: true, ...data };

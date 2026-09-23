@@ -45,9 +45,11 @@ Todas las variables requeridas, sin valores reales, están en
 [`.env.example`](./.env.example): la clave de Google Gemini (`GEMINI_API_KEY`)
 y el modelo (`GEMINI_MODEL`, por defecto `gemini-flash-lite-latest` — el nivel
 más económico de la familia Gemini), los topes de costo configurables por sesión
-(`MAX_TOKENS_POR_SESION`, `MAX_COSTO_USD_POR_SESION`; ver `SOLUCION.md` §4) y
-el puerto del backend (`PORT`). El tope de **iteraciones** del ciclo del
-agente es fijo en 8 (`CLAUDE.md`) y vive en código, no es variable de entorno.
+(`MAX_TOKENS_POR_SESION`, `MAX_COSTO_USD_POR_SESION`; ver `SOLUCION.md` §4), el
+tope de **iteraciones** del ciclo del agente (`MAX_ITERACIONES`, 8 por defecto
+— PRD y CLAUDE.md piden que sea configurable), quién queda registrado como
+confirmador de una excepción (`USUARIO_CONFIRMADOR`, por defecto `"analista"`)
+y el puerto del backend (`PORT`).
 
 La clave del modelo se lee **solo** de variable de entorno: nunca vive en el
 repositorio, en el front, en los logs ni en la respuesta de `/api/health`.

@@ -1,9 +1,10 @@
 /**
  * El ciclo del agente (PRD §6.3): mensaje → decidir herramienta → ejecutar →
- * observar → responder. Tope de 8 iteraciones fijo en código (CLAUDE.md; no
- * las 25 genéricas del PRD — ver SOLUCION.md §3). El modelo nunca evalúa
- * RC1–RC10: esas comparaciones ya vienen resueltas en lo que devuelve
- * oc_validar, este archivo solo transporta ese resultado.
+ * observar → responder. Tope de iteraciones configurable por variable de
+ * entorno (`MAX_ITERACIONES`, 8 por defecto — CLAUDE.md; no las 25 genéricas
+ * del PRD — ver SOLUCION.md §3). El modelo nunca evalúa RC1–RC10: esas
+ * comparaciones ya vienen resueltas en lo que devuelve oc_validar, este
+ * archivo solo transporta ese resultado.
  *
  * Estado en el servidor, no en el modelo (SOLUCION.md §8): `oc_validar`,
  * `oc_generar_evidencia`, `oc_construir_payload` y `oc_crear` NO le piden al
@@ -17,13 +18,14 @@
  */
 
 import { readFileSync } from "node:fs";
+import { mkdir, appendFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import type { AdaptadorLLM, DescripcionHerramienta, MensajeLLM } from "./llm";
 import * as herramientasOc from "../tools/oc";
 import type { Paquete, Validacion, OrdenCompra } from "../tipos";
 
-const TOPE_ITERACIONES = 8;
+const TOPE_ITERACIONES_DEFAULT = 8;
 // El ciclo reenvía el historial completo de la sesión en cada llamada al
 // modelo (no lo poda ni lo resume), así que una sesión larga con varios casos
 // acumula contexto rápido. 200_000 tokens / USD 1 eran valores de arranque
@@ -199,16 +201,36 @@ export function obtenerHistorialSesion(sessionId: string): ItemHistorialFrontend
 }
 
 let systemPromptCache: string | null = null;
-function cargarSystemPrompt(directory: string): string {
-  if (systemPromptCache === null) {
-    const ruta = path.join(directory, "src", "agente", "prompt.md");
+/** Nunca lanza: una falla leyendo prompt.md se devuelve como error, no como excepción. */
+function cargarSystemPrompt(directory: string): { ok: true; texto: string } | { ok: false; error: string } {
+  if (systemPromptCache !== null) return { ok: true, texto: systemPromptCache };
+  const ruta = path.join(directory, "src", "agente", "prompt.md");
+  try {
     systemPromptCache = readFileSync(ruta, "utf-8");
+    return { ok: true, texto: systemPromptCache };
+  } catch (e) {
+    return { ok: false, error: `No se pudo leer el system prompt (${ruta}): ${e instanceof Error ? e.message : String(e)}` };
   }
-  return systemPromptCache;
 }
 
 function ahora(): string {
   return new Date().toISOString();
+}
+
+/**
+ * Anexa una línea a `out/log.jsonl`: un registro por cada llamada a
+ * herramienta (SOLUCION.md §3). Es un log de auditoría, no el registro
+ * transaccional (ése es `out/sap/ordenes.jsonl`), así que si falla la
+ * escritura no interrumpe el turno — solo se deja constancia en stderr.
+ */
+async function registrarLog(directory: string, entrada: Record<string, unknown>): Promise<void> {
+  try {
+    const carpetaOut = path.join(directory, "out");
+    await mkdir(carpetaOut, { recursive: true });
+    await appendFile(path.join(carpetaOut, "log.jsonl"), `${JSON.stringify(entrada)}\n`, "utf-8");
+  } catch (e) {
+    console.error(`[ciclo] No se pudo escribir out/log.jsonl: ${e instanceof Error ? e.message : String(e)}`);
+  }
 }
 
 function leerTope(nombreVar: string, porDefecto: number): number {
@@ -353,8 +375,11 @@ async function despacharHerramienta(
           };
         }
       }
+      // `validacion` NO se pasa: oc_crear la re-deriva ella misma desde el
+      // caso (Tarea 2 de la auditoría) — la garantía vive en la herramienta,
+      // no en este despacho.
       const resultadoStr = await herramientasOc.crear.execute(
-        { caso: parseado.data.caso, payload: estado.payload, validacion: estado.validacion, confirmado: parseado.data.confirmado },
+        { caso: parseado.data.caso, payload: estado.payload, confirmado: parseado.data.confirmado },
         ctx
       );
       const resultado = parsearResultadoHerramienta(resultadoStr);
@@ -415,6 +440,7 @@ export async function procesarMensaje(
 
   const topeTokens = leerTope("MAX_TOKENS_POR_SESION", MAX_TOKENS_POR_SESION_DEFAULT);
   const topeCostoUsd = leerTope("MAX_COSTO_USD_POR_SESION", MAX_COSTO_USD_POR_SESION_DEFAULT);
+  const topeIteraciones = leerTope("MAX_ITERACIONES", TOPE_ITERACIONES_DEFAULT);
 
   console.log(
     `[ciclo] sesión ${sessionId}: tokens acumulados=${sesion.tokensAcumulados}/${topeTokens}, costo acumulado=$${sesion.costoAcumuladoUsd.toFixed(4)}/$${topeCostoUsd}`
@@ -427,11 +453,17 @@ export async function procesarMensaje(
     return;
   }
 
-  const systemPrompt = cargarSystemPrompt(directory);
+  const promptCargado = cargarSystemPrompt(directory);
+  if (!promptCargado.ok) {
+    emitir({ evento: "error", data: { message: promptCargado.error, recoverable: false } });
+    sesion.historialFrontend.push({ type: "error", message: promptCargado.error, ts: ahora() });
+    return;
+  }
+  const systemPrompt = promptCargado.texto;
   let seEjecutoOcCrearConExito = false;
 
-  for (let iteracion = 0; iteracion < TOPE_ITERACIONES; iteracion++) {
-    console.log(`[ciclo] sesión ${sessionId}: iteración ${iteracion + 1}/${TOPE_ITERACIONES}`);
+  for (let iteracion = 0; iteracion < topeIteraciones; iteracion++) {
+    console.log(`[ciclo] sesión ${sessionId}: iteración ${iteracion + 1}/${topeIteraciones}`);
     const respuesta = await llm.enviar(systemPrompt, sesion.mensajesLlm, DESCRIPCIONES_HERRAMIENTAS);
 
     if (!respuesta.ok) {
@@ -492,6 +524,14 @@ export async function procesarMensaje(
       const despacho = await despacharHerramienta(nombreHerramienta, llamada.args, sesion, ctx, casosValidadosEnEsteTurno);
       if (despacho.ocCrearExitoso) seEjecutoOcCrearConExito = true;
 
+      await registrarLog(directory, {
+        ts: ahora(),
+        sessionId,
+        herramienta: nombreHerramienta,
+        args: llamada.args,
+        resultado: despacho.resultado,
+      });
+
       sesion.mensajesLlm.push({
         rol: "tool",
         id_llamada: llamada.id,
@@ -503,10 +543,10 @@ export async function procesarMensaje(
     }
   }
 
-  // Tope de 8 iteraciones alcanzado sin terminar (CLAUDE.md): se corta, se
-  // dice explícitamente, no se reintenta en bucle.
+  // Tope de iteraciones alcanzado sin terminar (CLAUDE.md): se corta, se dice
+  // explícitamente, no se reintenta en bucle.
   const mensajeTope =
-    "Llegué al tope de iteraciones (8) sin terminar de procesar el caso. Puedo seguir si me pedís que continúe.";
+    `Llegué al tope de iteraciones (${topeIteraciones}) sin terminar de procesar el caso. Puedo seguir si me pedís que continúe.`;
   emitir({ evento: "message", data: { text: mensajeTope, final: true } });
   sesion.historialFrontend.push({ type: "message", text: mensajeTope, ts: ahora() });
   emitir({ evento: "done", data: { needsConfirmation: false } });
