@@ -87,5 +87,29 @@ agente y el adaptador de proveedor de modelo, y `web/` es el front de chat.
 _(Se completa cuando el proyecto quede desplegado. Mientras tanto, se corre en
 local con los pasos de arriba.)_
 
+### Cómo desplegar en Render.com (free tier, sin tarjeta)
+
+El repo ya trae `Dockerfile` y `render.yaml` (Render Blueprint) listos. Pasos
+en el dashboard de Render (no requiere CLI):
+
+1. Creá una cuenta en [render.com](https://render.com) (con GitHub, sin
+   tarjeta para el free tier).
+2. **New +** → **Blueprint** → conectá este repositorio de GitHub
+   (`agente-oc-periferia`). Render lee `render.yaml` solo.
+3. En la pantalla de variables de entorno, completá `GEMINI_API_KEY` con tu
+   clave real (el resto de las variables ya vienen con default en
+   `render.yaml`). Nunca se escribe en el repo — vive solo en el dashboard de
+   Render.
+4. **Apply** / **Create Web Service**. El build usa el `Dockerfile` (imagen
+   `oven/bun:1`), corre `bun install --frozen-lockfile` y arranca con
+   `bun run src/server.ts`.
+5. Cuando el estado quede en **Live**, Render te da la URL pública
+   (`https://agente-oc-periferia-XXXX.onrender.com` o el nombre que hayas
+   puesto). Pegala en esta sección del README.
+
+Nota del free tier de Render: el servicio "duerme" tras ~15 min sin tráfico y
+el primer pedido después tarda unos segundos en despertarlo — es normal, no
+es un error de la app.
+
 Si el link queda protegido con una clave de acceso, se documenta acá antes de
 la defensa.
