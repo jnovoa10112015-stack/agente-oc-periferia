@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.local
+out/
+dist/
+.DS_Store
+.claude/
+
+# Material de trabajo propio: NO se entrega
+referencia/
+prompts/
+CLAUDE.md
+PASOS.md

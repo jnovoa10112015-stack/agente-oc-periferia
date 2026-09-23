@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agente OC · Periferia</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <div class="app-header__title">
+        <h1>Agente de Órdenes de Compra</h1>
+        <p class="app-header__subtitle">Periferia · SAP simulado</p>
+      </div>
+      <div class="app-header__actions">
+        <span id="session-indicator" class="session-indicator" title="ID de sesión"></span>
+        <button id="btn-nueva" class="btn btn--ghost" type="button">Nueva conversación</button>
+      </div>
+    </header>
+
+    <main id="chat-log" class="chat-log" aria-live="polite" aria-label="Historial de conversación"></main>
+
+    <footer class="composer">
+      <div id="confirm-banner" class="confirm-banner" hidden role="alert">
+        <div class="confirm-banner__head">
+          <span class="badge badge--confirmacion">Esperando confirmación</span>
+        </div>
+        <p id="confirm-banner__text" class="confirm-banner__text"></p>
+        <div id="confirm-banner__hallazgos" class="confirm-banner__hallazgos"></div>
+        <div class="confirm-banner__actions">
+          <button id="btn-confirmar" class="btn btn--confirm" type="button">Confirmar</button>
+          <button id="btn-cancelar" class="btn btn--cancel" type="button">Cancelar</button>
+        </div>
+      </div>
+      <form id="composer-form" class="composer-form">
+        <textarea
+          id="composer-input"
+          class="composer-input"
+          placeholder="Escribí un mensaje... (ej: procesa la solicitud sol-004)"
+          rows="1"
+          autocomplete="off"
+        ></textarea>
+        <button id="btn-enviar" class="btn btn--primary" type="submit">Enviar</button>
+      </form>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
